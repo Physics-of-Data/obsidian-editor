@@ -20,16 +20,14 @@ default_vault="$(readlink -f "$vault_where_files_must_be_opened")" || \
 
 
 
+
 get_linked_files() {
 	# Also create symlinks to local files, like images, to which the Markdown file links
 	md_dir="$(dirname "$1")"
 	
-	echo "md_dir: $md_dir" > /tmp/link_debug.txt
-	echo "link target dir (param 2): $2" >> /tmp/link_debug.txt
-	echo "===" >> /tmp/link_debug.txt
-	
 	# Use mapfile to read all links into an array
-	mapfile -t links < <(sed -En 's/.*!*\[[^]]*\]\(([^)]+)\).*/\1/p' "$1")
+    mapfile -t links < <(sed -En -e 's/.*!*\[[^]]*\]\(([^)]+)\).*/\1/p' \
+                            -e 's/.*<img[^>]* src="([^?"]+)("|\?).*/\1/p' "$1")
 	
 	for linktext in "${links[@]}"
 	do
@@ -39,41 +37,21 @@ get_linked_files() {
 		linked_file="$(readlink -f "$md_dir/$decoded_link" 2>/dev/null || \
 			readlink "$md_dir/$decoded_link" 2>/dev/null)"
 		
-		echo "Processing: $linktext" >> /tmp/link_debug.txt
-		echo "  Resolved to: $linked_file" >> /tmp/link_debug.txt
-		
 		# is it really a local file, and not higher up in the file tree?
 		if [[ -n "$linked_file" && "$linked_file" == "$md_dir"* ]]
 		then
-			echo "  ✓ Passed checks" >> /tmp/link_debug.txt
 			link_dir=$2
 			# create subdirs if needed
 			abs_dir="$(dirname "$linked_file")"
-			echo "  abs_dir: $abs_dir" >> /tmp/link_debug.txt
-			
 			if [[ "$md_dir" != "$abs_dir" ]]
 			then
 				link_dir="$link_dir${abs_dir#$md_dir}"
-				echo "  Creating subdir: $link_dir" >> /tmp/link_debug.txt
 				mkdir -p "$link_dir"
 			fi
 			linkpath="$link_dir/$(basename "$linked_file")"
-			echo "  Symlink: $linkpath -> $linked_file" >> /tmp/link_debug.txt
-			
-			if [[ ! -e "$linkpath" ]]
-			then
-				ln -s "$linked_file" "$linkpath"
-				echo "  ✓ Symlink created" >> /tmp/link_debug.txt
-			else
-				echo "  ✗ Symlink already exists" >> /tmp/link_debug.txt
-			fi
-		else
-			echo "  ✗ Failed checks" >> /tmp/link_debug.txt
+			[[ ! -e "$linkpath" ]] && ln -s "$linked_file" "$linkpath"
 		fi
-		echo "---" >> /tmp/link_debug.txt
 	done
-	
-	zenity --text-info --filename=/tmp/link_debug.txt --title="Debug Output" --width=700 --height=500
 }
 
 
