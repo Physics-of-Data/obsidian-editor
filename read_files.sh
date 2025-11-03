@@ -1,37 +1,39 @@
 #!/usr/bin/env bash
+# Shell script that make Obsidian act as a markdown editor for files
+# outside a vault.
 
 # CONFIGURATION
-vault_where_files_must_be_opened="/home/msfz751/obsidian/default/"
+# create a default vault with all JS goodies and plugins
+vault_where_files_must_be_opened="$HOME/obsidian/default/"
 subtrees_that_must_be_mirrored_in_vault=(
 "$HOME/Downloads/metadata/assets/DEJMarApr22vg"
 )
 
-# Main script
-# IFS=$'\n' all_vaults=($(awk -F':|,|{|}|"' '{for(i=1;i<=NF;i++)if($i=="path")print$(i+3)}'\
-#    <"$HOME/.config/obsidian/obsidian.json"))
+
+# Get vault names from obsidian.json
 all_vaults=$(awk -F':|,|{|}|"' '{for(i=1;i<=NF;i++)if($i=="path")print$(i+3)}'\
    <"$HOME/.config/obsidian/obsidian.json")
 
 default_vault="$(readlink -f "$vault_where_files_must_be_opened")" || \
     default_vault="$(readlink "$vault_where_files_must_be_opened")" || \
-    # on macOS 10.15 -f is not allowed with readlink
     default_vault="$(sed -E 's/.*"path":"([^"]+)",.*"open":true.*/\1/'\
    <"$HOME/.config/obsidian/obsidian.json")"  # currently active vault
 
 
 
-
 get_linked_files() {
-	# Also create symlinks to local files, like images, to which the Markdown file links
+	# create symlinks to support files, like images, PDF files to which the Markdown file links
 	md_dir="$(dirname "$1")"
 	
-	# Use mapfile to read all links into an array
+	# Use mapfile to read all links into an array. 
+	# 1st line for links of the kind ![image](assets/note_name/image.png)
+	# 2nd line for links <img src="assets/note_name/image.png" alt="image" style="zoom:80%;" />
     mapfile -t links < <(sed -En -e 's/.*!*\[[^]]*\]\(([^)]+)\).*/\1/p' \
                             -e 's/.*<img[^>]* src="([^?"]+)("|\?).*/\1/p' "$1")
 	
 	for linktext in "${links[@]}"
 	do
-		# URL decode the path (handle %20, %2F, etc.)
+		# URL decode the path (handle %20 as spaces, %2F, etc.)
 		decoded_link=$(printf '%b' "${linktext//%/\\x}")
 		
 		linked_file="$(readlink -f "$md_dir/$decoded_link" 2>/dev/null || \
@@ -62,6 +64,7 @@ open_file() {
 	open "obsidian://open?path=$url_encoded"
 }
 
+
 for file in "$@"
 do
 
@@ -89,14 +92,10 @@ do
 	#    and put a link to the file in it; then open that
 	for asset_folder in "${subtrees_that_must_be_mirrored_in_vault[@]}"
 	do
-        # zenity --info --title "Base" --text "$asset_folder, $(basename "$asset_folder")"
-        # zenity --info --title "abspath" --text "$abspath"
         linkpath="$default_vault/$(basename "$asset_folder")${abspath#$asset_folder}"
-        # zenity --info --title "linkpath" --text "$linkpath"
 		if [[ "$abspath" == "$asset_folder"* ]]
 		then
 			linkpath="$default_vault/$(basename "$asset_folder")${abspath#$asset_folder}"
-            # zenity --info --title "Selected" --text "$linkpath"
 			mkdir -p "$(dirname "$linkpath")"
 			ln -s "$abspath" "$linkpath"			
 			get_linked_files "$abspath" "$(dirname "$linkpath")"
@@ -106,7 +105,7 @@ do
 		fi
 	done    
 	
-	# 3. In other cases, replicate the FULL directory structure in the vault
+	# 3. In other cases, replicate the note's FULL directory structure in the vault
 	# Remove leading / from absolute path
 	relative_path="${abspath#/}"
 
