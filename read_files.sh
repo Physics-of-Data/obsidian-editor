@@ -6,32 +6,74 @@ subtrees_that_must_be_mirrored_in_vault=(
 "$HOME/Downloads/metadata/assets/DEJMarApr22vg"
 )
 
-# Utility functions
+# Main script
+# IFS=$'\n' all_vaults=($(awk -F':|,|{|}|"' '{for(i=1;i<=NF;i++)if($i=="path")print$(i+3)}'\
+#    <"$HOME/.config/obsidian/obsidian.json"))
+all_vaults=$(awk -F':|,|{|}|"' '{for(i=1;i<=NF;i++)if($i=="path")print$(i+3)}'\
+   <"$HOME/.config/obsidian/obsidian.json")
+
+default_vault="$(readlink -f "$vault_where_files_must_be_opened")" || \
+    default_vault="$(readlink "$vault_where_files_must_be_opened")" || \
+    # on macOS 10.15 -f is not allowed with readlink
+    default_vault="$(sed -E 's/.*"path":"([^"]+)",.*"open":true.*/\1/'\
+   <"$HOME/.config/obsidian/obsidian.json")"  # currently active vault
+
+
+
 get_linked_files() {
 	# Also create symlinks to local files, like images, to which the Markdown file links
 	md_dir="$(dirname "$1")"
-	# Obsidian 1.0.0 doesn't display <img src="..."> but perhaps a future version will
-	sed -En -e 's/.*\[[^]]*\]\(([^"]+)[^)]*\).*/\1/p' \
-			-e 's/.*<img[^>]* src="([^?"]+)("|\?).*/\1/p' <"$1" |
-		while IFS= read -r linktext
-		do
-			linked_file="$(readlink -f "$md_dir/${linktext% }" || \
-				readlink "$md_dir/${linktext% }")"  # on macOS 10.15 -f is not allowed
-			# is it really a local file, and not higher up in the file tree?
-			if [[ $? &&  "$linked_file" == "$md_dir"* ]]
+	
+	echo "md_dir: $md_dir" > /tmp/link_debug.txt
+	echo "link target dir (param 2): $2" >> /tmp/link_debug.txt
+	echo "===" >> /tmp/link_debug.txt
+	
+	# Use mapfile to read all links into an array
+	mapfile -t links < <(sed -En 's/.*!*\[[^]]*\]\(([^)]+)\).*/\1/p' "$1")
+	
+	for linktext in "${links[@]}"
+	do
+		# URL decode the path (handle %20, %2F, etc.)
+		decoded_link=$(printf '%b' "${linktext//%/\\x}")
+		
+		linked_file="$(readlink -f "$md_dir/$decoded_link" 2>/dev/null || \
+			readlink "$md_dir/$decoded_link" 2>/dev/null)"
+		
+		echo "Processing: $linktext" >> /tmp/link_debug.txt
+		echo "  Resolved to: $linked_file" >> /tmp/link_debug.txt
+		
+		# is it really a local file, and not higher up in the file tree?
+		if [[ -n "$linked_file" && "$linked_file" == "$md_dir"* ]]
+		then
+			echo "  ✓ Passed checks" >> /tmp/link_debug.txt
+			link_dir=$2
+			# create subdirs if needed
+			abs_dir="$(dirname "$linked_file")"
+			echo "  abs_dir: $abs_dir" >> /tmp/link_debug.txt
+			
+			if [[ "$md_dir" != "$abs_dir" ]]
 			then
-				link_dir=$2
-				# create subdirs if needed
-				abs_dir="$(dirname "$linked_file")"
-				if [[ "$md_dir" != "$abs_dir" ]]
-				then
-					link_dir="$link_dir${abs_dir#$md_dir}"
-					mkdir -p "$link_dir"
-				fi
-				linkpath="$link_dir/$(basename "$linked_file")"
-				[[ ! -e "$linkpath" ]] && ln -s "$linked_file" "$linkpath"
+				link_dir="$link_dir${abs_dir#$md_dir}"
+				echo "  Creating subdir: $link_dir" >> /tmp/link_debug.txt
+				mkdir -p "$link_dir"
 			fi
-		done
+			linkpath="$link_dir/$(basename "$linked_file")"
+			echo "  Symlink: $linkpath -> $linked_file" >> /tmp/link_debug.txt
+			
+			if [[ ! -e "$linkpath" ]]
+			then
+				ln -s "$linked_file" "$linkpath"
+				echo "  ✓ Symlink created" >> /tmp/link_debug.txt
+			else
+				echo "  ✗ Symlink already exists" >> /tmp/link_debug.txt
+			fi
+		else
+			echo "  ✗ Failed checks" >> /tmp/link_debug.txt
+		fi
+		echo "---" >> /tmp/link_debug.txt
+	done
+	
+	zenity --text-info --filename=/tmp/link_debug.txt --title="Debug Output" --width=700 --height=500
 }
 
 
