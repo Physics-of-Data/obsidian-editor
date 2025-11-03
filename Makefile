@@ -4,11 +4,11 @@
 PROJECT_NAME = nemo2obsidian
 BIN_DIR = $(HOME)/.local/bin
 NEMO_SCRIPTS_DIR = $(HOME)/.local/share/nemo/scripts
-
+SCRIPT = Obsieditor.sh
 
 preset:
 	@echo ${PROJECT_NAME}
 	@echo ${NEMO_SCRIPTS_DIR}
 
 install: check config install-presets
-	ln -sf $(PWD)/read_files.sh $(NEMO_SCRIPTS_DIR)/read_files.sh
+	ln -sf $(PWD)/${SCRIPT} $(NEMO_SCRIPTS_DIR)/${SCRIPT}
