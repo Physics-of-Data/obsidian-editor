@@ -105,21 +105,28 @@ do
 			continue 2
 		fi
 	done    
+	
+	# 3. In other cases, replicate the FULL directory structure in the vault
+	# Remove leading / from absolute path
+	relative_path="${abspath#/}"
 
-	# 3. In other cases, create a uniquely named symlink in the Temp folder and open it
-	mkdir -p "$default_vault/Temp"
-	filename="$(basename "$abspath")"
-	linkpath="$default_vault/Temp/$filename"
+	linkpath="$default_vault/$relative_path"
+	mkdir -p "$(dirname "$linkpath")"
 
-    # zenity --info --title "Selected" --text "$linkpath"
+	# If the exact symlink already exists, just open it
+	if [[ -L "$linkpath" && "$(readlink -f "$linkpath" 2>/dev/null || readlink "$linkpath")" == "$abspath" ]]; then
+		open_file "$linkpath"
+		continue
+	fi
 
-	while [[ -e "$linkpath" ]]  # don't overwrite existing symlinks: choose a unique name
+	# If something else exists at this location, create a unique name
+	while [[ -e "$linkpath" ]]
 	do
 		linkpath="${linkpath%.*}_$RANDOM.${linkpath##*.}"
 	done
+
 	ln -s "$abspath" "$linkpath"
-	get_linked_files "$abspath" "$default_vault/Temp"
+	get_linked_files "$abspath" "$(dirname "$linkpath")"
 	sleep 1
-	open_file "$linkpath"    
-	    
+	open_file "$linkpath" 
 done
