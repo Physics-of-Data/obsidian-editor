@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Shell script that make Obsidian act as a markdown editor for files
-# outside a vault.
+# outside a vault. Based on this macOS script: 
+# https://forum.obsidian.md/t/have-obsidian-be-the-handler-of-md-files-add-ability-to-use-obsidian-as-a-markdown-editor-on-files-outside-vault-file-association/314/155?u=msfz751
 
 # CONFIGURATION
-# create a default vault with all JS goodies and plugins
+# create a default vault with a1ll JS goodies and plugins
 vault_where_files_must_be_opened="$HOME/obsidian/default/"
 subtrees_that_must_be_mirrored_in_vault=(
-"$HOME/Downloads/metadata/assets/DEJMarApr22vg"
 )
 
 
