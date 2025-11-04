@@ -71,8 +71,9 @@ get_linked_files() {
 		# Skip empty links
 		[[ -z "$linktext" ]] && continue
 
-		# URL decode the path (handle %20 as spaces, %2C as commas, etc.)
-		local decoded_link=$(printf '%b' "${linktext//%/\\x}")
+		# Decode %20 back to spaces for filesystem operations
+		# The markdown has %20, but filesystem needs actual spaces
+		local decoded_link="${linktext//%20/ }"
 
 		# Resolve the linked file path - must quote to handle spaces
 		local linked_file=""
@@ -86,26 +87,22 @@ get_linked_files() {
 		# is it really a local file, and not higher up in the file tree?
 		if [[ -n "$linked_file" && "$linked_file" == "$md_dir"* ]]
 		then
-			# Create symlinks with URL-encoded names to match markdown links
-			# Obsidian expects filesystem paths to match the encoded links
+			# Create symlinks with ORIGINAL names (spaces, not %20)
+			# Only the markdown content has %20, not the filesystem
 			local abs_dir="$(dirname "$linked_file")"
 			local target_dir="$link_dir"
 
 			if [[ "$md_dir" != "$abs_dir" ]]
 			then
-				# Get the relative subdir path and URL-encode it
+				# Get the relative subdir path (with actual spaces)
 				local rel_subdir="${abs_dir#$md_dir}"
-				# URL-encode the directory path (use the encoded version from linktext)
-				local encoded_subdir=$(dirname "$linktext")
-				if [[ "$encoded_subdir" != "." ]]; then
-					target_dir="$link_dir/$encoded_subdir"
-					mkdir -p "$target_dir"
-				fi
+				target_dir="$link_dir$rel_subdir"
+				mkdir -p "$target_dir"
 			fi
 
-			# Use the encoded filename from the link
-			local encoded_filename=$(basename "$linktext")
-			local linkpath="$target_dir/$encoded_filename"
+			# Use the original filename (with spaces)
+			local original_filename=$(basename "$linked_file")
+			local linkpath="$target_dir/$original_filename"
 
 			if [[ ! -e "$linkpath" ]]; then
 				ln -s "$linked_file" "$linkpath"
