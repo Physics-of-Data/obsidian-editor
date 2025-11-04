@@ -21,37 +21,96 @@ default_vault="$(readlink -f "$vault_where_files_must_be_opened")" || \
 
 
 
+
+fix_markdown_links() {
+	# Fix markdown file to encode only spaces (not commas or other chars) in links
+	local md_file="$1"
+
+	# Use perl to find and encode ONLY spaces in markdown links
+	# Obsidian only requires spaces to be encoded as %20, other chars remain as-is
+	perl -i.bak -pe '
+		# Fix markdown-style links: ![...](path with spaces)
+		s{\]\(([^)]+)\)}{
+			my $path = $1;
+			if ($path =~ / / && $path !~ /%20/) {
+				$path =~ s/ /%20/g;
+			}
+			"](" . $path . ")";
+		}ge;
+
+		# Fix HTML img src: src="path with spaces"
+		s{src="([^"]+)"}{
+			my $path = $1;
+			if ($path =~ / / && $path !~ /%20/) {
+				$path =~ s/ /%20/g;
+			}
+			"src=\"" . $path . "\"";
+		}ge;
+	' "$md_file"
+
+	# Remove backup file created by perl -i
+	rm -f "${md_file}.bak"
+	logger "OPEN-IN-OBSIDIAN: Encoded spaces in paths for $md_file"
+}
+
+
+
 get_linked_files() {
 	# create symlinks to support files, like images, PDF files to which the Markdown file links
-	md_dir="$(dirname "$1")"
-	
-	# Use mapfile to read all links into an array. 
+	local md_dir="$(dirname "$1")"
+	local link_dir="$2"
+
+	# Use mapfile to read all links into an array.
 	# 1st line for links of the kind ![image](assets/note_name/image.png)
 	# 2nd line for links <img src="assets/note_name/image.png" alt="image" style="zoom:80%;" />
     mapfile -t links < <(sed -En -e 's/.*!*\[[^]]*\]\(([^)]+)\).*/\1/p' \
                             -e 's/.*<img[^>]* src="([^?"]+)("|\?).*/\1/p' "$1")
-	
+
 	for linktext in "${links[@]}"
 	do
-		# URL decode the path (handle %20 as spaces, %2F, etc.)
-		decoded_link=$(printf '%b' "${linktext//%/\\x}")
-		
-		linked_file="$(readlink -f "$md_dir/$decoded_link" 2>/dev/null || \
-			readlink "$md_dir/$decoded_link" 2>/dev/null)"
-		
+		# Skip empty links
+		[[ -z "$linktext" ]] && continue
+
+		# URL decode the path (handle %20 as spaces, %2C as commas, etc.)
+		local decoded_link=$(printf '%b' "${linktext//%/\\x}")
+
+		# Resolve the linked file path - must quote to handle spaces
+		local linked_file=""
+		if [[ -e "$md_dir/$decoded_link" ]]; then
+			linked_file="$(readlink -f "$md_dir/$decoded_link" 2>/dev/null || \
+				readlink "$md_dir/$decoded_link" 2>/dev/null)"
+		else
+			logger "OPEN-IN-OBSIDIAN warning: Linked file not found: $md_dir/$decoded_link"
+		fi
+
 		# is it really a local file, and not higher up in the file tree?
 		if [[ -n "$linked_file" && "$linked_file" == "$md_dir"* ]]
 		then
-			link_dir=$2
-			# create subdirs if needed
-			abs_dir="$(dirname "$linked_file")"
+			# Create symlinks with URL-encoded names to match markdown links
+			# Obsidian expects filesystem paths to match the encoded links
+			local abs_dir="$(dirname "$linked_file")"
+			local target_dir="$link_dir"
+
 			if [[ "$md_dir" != "$abs_dir" ]]
 			then
-				link_dir="$link_dir${abs_dir#$md_dir}"
-				mkdir -p "$link_dir"
+				# Get the relative subdir path and URL-encode it
+				local rel_subdir="${abs_dir#$md_dir}"
+				# URL-encode the directory path (use the encoded version from linktext)
+				local encoded_subdir=$(dirname "$linktext")
+				if [[ "$encoded_subdir" != "." ]]; then
+					target_dir="$link_dir/$encoded_subdir"
+					mkdir -p "$target_dir"
+				fi
 			fi
-			linkpath="$link_dir/$(basename "$linked_file")"
-			[[ ! -e "$linkpath" ]] && ln -s "$linked_file" "$linkpath"
+
+			# Use the encoded filename from the link
+			local encoded_filename=$(basename "$linktext")
+			local linkpath="$target_dir/$encoded_filename"
+
+			if [[ ! -e "$linkpath" ]]; then
+				ln -s "$linked_file" "$linkpath"
+				logger "OPEN-IN-OBSIDIAN: Created symlink for '$linkpath'"
+			fi
 		fi
 	done
 }
@@ -65,6 +124,43 @@ open_file() {
 }
 
 
+reload_obsidian() {
+	# Reload Obsidian vault to show newly created symlinks
+	# Target the specific vault window by matching the vault name in the window title
+	vault_name="$(basename "$1")"
+
+	# Obsidian window titles format: "Note Name - Vault Name - Obsidian v..."
+	# We need to match " - vault_name - " to ensure we get the right vault
+	window_id=""
+	while IFS= read -r wid; do
+		window_title=$(xdotool getwindowname "$wid")
+		# Match the vault name between " - " delimiters to avoid partial matches
+		if [[ "$window_title" =~ \ -\ $vault_name\ -\  ]]; then
+			window_id="$wid"
+			break
+		fi
+	done < <(xdotool search --class "obsidian")
+
+	if [[ -z "$window_id" ]]; then
+		# Fallback: if we can't find by exact match, try the first obsidian window
+		window_id=$(xdotool search --class "obsidian" | head -n 1)
+		logger "OPEN-IN-OBSIDIAN warning: Could not find window for vault '$vault_name', using fallback"
+	fi
+
+	if [[ -n "$window_id" ]]; then
+		# Activate the specific window and execute reload command
+		xdotool windowactivate --sync "$window_id" key --clearmodifiers ctrl+p
+		sleep 0.3
+		xdotool type --clearmodifiers "Reload app without saving"
+		sleep 0.3
+		xdotool key Return
+		sleep 0.5
+	else
+		logger "OPEN-IN-OBSIDIAN warning: Could not find any Obsidian window"
+	fi
+}
+
+
 for file in "$@"
 do
 
@@ -75,6 +171,17 @@ do
 		continue
 	fi
 	abspath=$(readlink -f "$file" || readlink "$file")  # on macOS 10.15 -f is not allowed
+
+	# Create a backup of the markdown file and fix links with spaces
+	if [[ "$abspath" == *.md ]]
+	then
+		backup_path="${abspath%.md}.bkup.md"
+		cp "$abspath" "$backup_path"
+		logger "OPEN-IN-OBSIDIAN: Created backup at $backup_path"
+
+		# URL-encode any paths with spaces in the markdown file
+		fix_markdown_links "$abspath"
+	fi
 
 	# 1. If the file is inside any vault (in place or linked), just open it
 	for v in "${all_vaults[@]}"
@@ -100,6 +207,8 @@ do
 			ln -s "$abspath" "$linkpath"			
 			get_linked_files "$abspath" "$(dirname "$linkpath")"
 			sleep 1  # delay for Obsidian to notice the new file(s)
+			reload_obsidian "$default_vault"
+			sleep 1
 			open_file "$linkpath"
 			continue 2
 		fi
@@ -126,6 +235,8 @@ do
 
 	ln -s "$abspath" "$linkpath"
 	get_linked_files "$abspath" "$(dirname "$linkpath")"
+	sleep 1
+	reload_obsidian "$default_vault"
 	sleep 1
 	open_file "$linkpath" 
 done
