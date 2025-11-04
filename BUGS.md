@@ -297,6 +297,9 @@ The script now supports:
 
 ---
 
+
+---
+
 ## Future Improvements
 
 1. Add option to disable automatic reload
@@ -304,3 +307,5 @@ The script now supports:
 3. Support for other special characters if needed
 4. Better error handling for missing dependencies
 5. Windows support via WSL
+6. Add templates for new file creation
+7. Add `-h` or `--help` flag for help message
