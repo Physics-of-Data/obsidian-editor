@@ -10,8 +10,8 @@ subtrees_that_must_be_mirrored_in_vault=(
 )
 
 
-# Get vault names from obsidian.json
-all_vaults=$(awk -F':|,|{|}|"' '{for(i=1;i<=NF;i++)if($i=="path")print$(i+3)}'\
+# Get vault names from obsidian.json as an array
+mapfile -t all_vaults < <(awk -F':|,|{|}|"' '{for(i=1;i<=NF;i++)if($i=="path")print$(i+3)}'\
    <"$HOME/.config/obsidian/obsidian.json")
 
 default_vault="$(readlink -f "$vault_where_files_must_be_opened")" || \
@@ -117,7 +117,16 @@ open_file() {
 	# Thanks, https://stackoverflow.com/a/75300235/7840347
 	url_encoded="$(perl -e 'use URI; print URI->new("'"$1"'");')"
 	if [[ -z $url_encoded ]]; then url_encoded="$1"; fi   # in case perl returns nothing
-	open "obsidian://open?path=$url_encoded"
+
+	# Use xdg-open on Linux, open on macOS
+	if command -v xdg-open &> /dev/null; then
+		xdg-open "obsidian://open?path=$url_encoded"
+	elif command -v open &> /dev/null; then
+		open "obsidian://open?path=$url_encoded"
+	else
+		logger "OPEN-IN-OBSIDIAN error: Neither xdg-open nor open command found"
+		return 1
+	fi
 }
 
 
