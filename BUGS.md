@@ -220,11 +220,80 @@ Test cases verified:
 
 ---
 
+## Bug #4: Script Fails on Linux with "open: command not found"
+
+### Problem
+The script used the macOS-specific `open` command to open Obsidian URIs, which doesn't exist on Linux systems, causing the error:
+```
+line 120: open: command not found
+```
+
+### Solution
+Added OS detection to use the appropriate command:
+
+```bash
+open_file() {
+	# Thanks, https://stackoverflow.com/a/75300235/7840347
+	url_encoded="$(perl -e 'use URI; print URI->new("'"$1"'");')"
+	if [[ -z $url_encoded ]]; then url_encoded="$1"; fi   # in case perl returns nothing
+
+	# Use xdg-open on Linux, open on macOS
+	if command -v xdg-open &> /dev/null; then
+		xdg-open "obsidian://open?path=$url_encoded"
+	elif command -v open &> /dev/null; then
+		open "obsidian://open?path=$url_encoded"
+	else
+		logger "OPEN-IN-OBSIDIAN error: Neither xdg-open nor open command found"
+		return 1
+	fi
+}
+```
+
+**Result**: Script now works on both Linux (using `xdg-open`) and macOS (using `open`).
+
+---
+
+## Bug #5: Vault Array Not Properly Initialized
+
+### Problem
+The `all_vaults` variable was defined as a string but used as an array, causing the `find` command to receive a malformed path with literal `\n` characters:
+```
+find: '/home/msfz751/obsidian/Daily\n/home/msfz751/obsidian/PhysicsOfData\n...' No such file or directory
+```
+
+### Solution
+Changed vault initialization to properly create an array using `mapfile`:
+
+**Before**:
+```bash
+all_vaults=$(awk -F':|,|{|}|"' '{for(i=1;i<=NF;i++)if($i=="path")print$(i+3)}'\
+   <"$HOME/.config/obsidian/obsidian.json")
+```
+
+**After**:
+```bash
+mapfile -t all_vaults < <(awk -F':|,|{|}|"' '{for(i=1;i<=NF;i++)if($i=="path")print$(i+3)}'\
+   <"$HOME/.config/obsidian/obsidian.json")
+```
+
+**Result**: Each vault path is now properly stored as a separate array element, and the `find` command works correctly.
+
+---
+
 ## Dependencies
 
 - `perl`: For markdown link processing
-- `xdotool`: For automated Obsidian reload
+- `xdg-open` (Linux) or `open` (macOS): For opening Obsidian URIs
+- `xdotool`: For automated Obsidian reload (Linux only)
 - `readlink`: For resolving file paths (with `-f` flag support)
+
+---
+
+## Platform Support
+
+The script now supports:
+- ✅ **Linux** (tested on CachyOS)
+- ✅ **macOS** (original target platform)
 
 ---
 
@@ -234,3 +303,4 @@ Test cases verified:
 2. Add option to disable automatic backup
 3. Support for other special characters if needed
 4. Better error handling for missing dependencies
+5. Windows support via WSL
