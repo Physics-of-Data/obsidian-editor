@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 # Shell script that make Obsidian act as a markdown editor for files
-# outside a vault. Based on this macOS script: 
+# outside a vault. Based on this macOS script:
 # https://forum.obsidian.md/t/have-obsidian-be-the-handler-of-md-files-add-ability-to-use-obsidian-as-a-markdown-editor-on-files-outside-vault-file-association/314/155?u=msfz751
+
+# Usage:
+#   Obsieditor.sh <file.md>           # Open existing file
+#   Obsieditor.sh -n <file.md>        # Create and open new file
+#   Obsieditor.sh --new <file.md>     # Create and open new file
 
 # CONFIGURATION
 # create a default vault with a1ll JS goodies and plugins
@@ -167,8 +172,61 @@ reload_obsidian() {
 }
 
 
-for file in "$@"
+# Parse arguments for --new/-n flag
+create_new=false
+files_to_process=()
+
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+		-n|--new)
+			create_new=true
+			shift
+			;;
+		*)
+			files_to_process+=("$1")
+			shift
+			;;
+	esac
+done
+
+# If no files provided, show usage
+if [[ ${#files_to_process[@]} -eq 0 ]]; then
+	echo "Usage: $(basename "$0") [-n|--new] <file.md> [file2.md ...]"
+	echo ""
+	echo "Options:"
+	echo "  -n, --new    Create new file(s) if they don't exist"
+	echo ""
+	echo "Examples:"
+	echo "  $(basename "$0") existing.md"
+	echo "  $(basename "$0") -n new_note.md"
+	echo "  $(basename "$0") --new 'My New Note.md'"
+	exit 1
+fi
+
+for file in "${files_to_process[@]}"
 do
+	# If create_new flag is set and file doesn't exist, create it
+	if [[ "$create_new" == true && ! -f "$file" ]]; then
+		# Ensure .md extension
+		if [[ "$file" != *.md ]]; then
+			file="${file}.md"
+		fi
+
+		# Create parent directory if needed
+		parent_dir="$(dirname "$file")"
+		if [[ ! -d "$parent_dir" ]]; then
+			mkdir -p "$parent_dir"
+			logger "OPEN-IN-OBSIDIAN: Created directory $parent_dir"
+		fi
+
+		# Create empty markdown file with a basic header
+		cat > "$file" << EOF
+# $(basename "$file" .md)
+
+EOF
+		logger "OPEN-IN-OBSIDIAN: Created new file $file"
+		echo "Created new file: $file"
+	fi
 
     # check for existence and readability
 	if [[ (! -f "$file") || (! -r "$file") ]]
