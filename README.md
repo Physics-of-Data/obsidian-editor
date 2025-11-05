@@ -1,4 +1,4 @@
-Borrowing some ideas from the script [here]() in the Obsidian forums, I have made some minor modifications for use in Linux. I use CachyOS with GNOME,and Nemo as File Explorer. Thanks [@bvdg](https://forum.obsidian.md/u/bvdg).
+Borrowing some ideas from the script [here](https://forum.obsidian.md/t/have-obsidian-be-the-handler-of-md-files-add-ability-to-use-obsidian-as-a-markdown-editor-on-files-outside-vault-file-association/314/155?u=msfz751) in the Obsidian forums, I have made some minor modifications for use in Linux. I use CachyOS with GNOME,and Nemo as File Explorer. Thanks [@bvdg](https://forum.obsidian.md/u/bvdg).
 
 In its simplest form, I copy the script **obseditor** to $HOME/.local/share/nemo/scripts. You could do the same in Nautilus. Then, I just select the markdown note that I want to edit in Obsidian from the context menu, and I will get the note and its attached files all in an Obsidian vault. I created a dummy vault for this purpose - I called it “default”, although you can bring off-vault notes to the vault of your preference. You set that in vault_where_files_must_be_opened variable at the top of the bash script.
 
