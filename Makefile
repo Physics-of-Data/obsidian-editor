@@ -4,7 +4,7 @@
 PROJECT_NAME = nemo2obsidian
 BIN_DIR = $(HOME)/.local/bin
 NEMO_SCRIPTS_DIR = $(HOME)/.local/share/nemo/scripts
-SCRIPT = Obsieditor.sh
+SCRIPT = obseditor
 
 preset:
 	@echo ${PROJECT_NAME}
