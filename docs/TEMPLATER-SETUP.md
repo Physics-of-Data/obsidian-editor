@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This Templater script syncs attachments (images, PDFs) from the Obsidian vault back to the filesystem, allowing them to be accessible by external editors like Typora.
+This Templater script **Sync Attachments.md** syncs attachments (images, PDFs) from the Obsidian vault back to the filesystem, allowing them to be accessible by external editors like Typora.
 
 ## How It Works
 

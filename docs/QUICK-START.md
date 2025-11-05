@@ -6,10 +6,10 @@ This toolset allows you to edit markdown files from anywhere on your filesystem 
 
 ## Installation
 
-1. Place `obseditor` in `/storage/develop/utils/obsidian-editor/`
-2. Make it executable: `chmod +x obseditor`
-3. Copy `Sync Attachments.md` to `~/obsidian/default/Templates/`
-4. Configure *Templater* hotkey (see below)
+1. Place `obseditor` in `$HOME/.local/share/nemo/scripts` if you want to invoke the script from Nemo file explorer. Or place it under `$HOME/.local/bin` if you plan to run it from the terminal
+2. In any of both cases, make it executable: `chmod +x obseditor`
+3. Copy `Sync Attachments.md` to `~/obsidian/default/Templates/`. This assumes that the Obsidian vault has been named **default**
+4. Configure the *Templater* hotkey (see below)
 
 ## Basic Workflow
 
@@ -27,7 +27,7 @@ This toolset allows you to edit markdown files from anywhere on your filesystem 
 ### What Happens:
 1. Script creates backup: `MyNote.bkup.md`
 2. Fixes spaces in markdown links (converts to `%20`)
-3. Creates symlink in vault: `~/obsidian/default/home/user/Documents/MyNote.md`
+3. Creates symlink in vault: `~/obsidian/default/$HOME/Documents/MyNote.md`
 4. Creates symlinks for attachments (images, PDFs)
 5. Reloads Obsidian automatically
 6. Opens the file in Obsidian
