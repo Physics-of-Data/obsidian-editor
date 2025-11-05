@@ -12,3 +12,4 @@ preset:
 
 install: check config install-presets
 	ln -sf $(PWD)/${SCRIPT} $(NEMO_SCRIPTS_DIR)/${SCRIPT}
+	ln -sf $(PWD)/${SCRIPT} $(BIN_DIR)/${SCRIPT}
