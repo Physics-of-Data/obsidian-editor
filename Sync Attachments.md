@@ -35,9 +35,151 @@ async function syncAttachments() {
     const noteBaseName = path.basename(realMarkdownPath, '.md');
 
     // Read the file content
-    const content = await app.vault.read(currentFile);
+    let content = await app.vault.read(currentFile);
 
-    // Find all attachment links (images and PDFs)
+    // STEP 1: Fix any markdown links that still have spaces (from Typora edits)
+    // This ensures all links are properly encoded before we process attachments
+    let fixedContent = content;
+    let spacesFixed = 0;
+
+    // Fix standard markdown links: ![...](path with spaces)
+    fixedContent = fixedContent.replace(/\]\(([^)]+)\)/g, (match, path) => {
+        if (path.includes(' ') && !path.includes('%20')) {
+            spacesFixed++;
+            return '](' + path.replace(/ /g, '%20') + ')';
+        }
+        return match;
+    });
+
+    // Fix HTML img src: src="path with spaces"
+    fixedContent = fixedContent.replace(/src="([^"]+)"/g, (match, path) => {
+        if (path.includes(' ') && !path.includes('%20')) {
+            spacesFixed++;
+            return 'src="' + path.replace(/ /g, '%20') + '"';
+        }
+        return match;
+    });
+
+    if (spacesFixed > 0) {
+        console.log(`🔧 Fixed ${spacesFixed} link(s) with spaces`);
+        await app.vault.modify(currentFile, fixedContent);
+        content = fixedContent;  // Update content for further processing
+    }
+
+    // STEP 1.5: Fix basename-only links for files moved to note-named subfolders
+    // This handles the case where images are moved in Obsidian to subfolders but
+    // the markdown link doesn't get updated with the path prefix
+    let basenameFixedContent = content;
+    let basenamesFixed = 0;
+
+    // Check if a note-named assets subfolder exists in the vault
+    const vaultMirroredBase = path.join(vaultPath, realDir.substring(1)); // Remove leading /
+    const vaultMirroredAssets = path.join(vaultMirroredBase, 'assets');
+    const noteNamedSubfolder = path.join(vaultMirroredAssets, noteBaseName);
+
+    if (fs.existsSync(noteNamedSubfolder)) {
+        console.log(`📂 Found note-named subfolder: ${noteNamedSubfolder}`);
+
+        // Get all files in the note-named subfolder
+        const { execSync } = require('child_process');
+        try {
+            // Use -type l for symlinks since files in vault are symlinked to filesystem
+            const findCmd = `find "${noteNamedSubfolder}" \\( -type f -o -type l \\) \\( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" -o -name "*.gif" -o -name "*.svg" -o -name "*.pdf" -o -name "*.webp" \\) 2>/dev/null`;
+            const filesInSubfolder = execSync(findCmd, { encoding: 'utf8' }).trim();
+
+            if (filesInSubfolder) {
+                const fileList = filesInSubfolder.split('\n');
+                console.log(`📋 Found ${fileList.length} file(s) in note-named subfolder`);
+
+                // For each file, get its basename
+                const basenameMap = {};
+                fileList.forEach(filePath => {
+                    const basename = path.basename(filePath);
+                    basenameMap[basename] = filePath;
+                });
+
+                // Find basename-only links in the markdown (no path prefix)
+                // Match ![...](filename.ext) where filename has no / or \
+                const basenameOnlyRegex = /!\[([^\]]*)\]\(([^)\/\\]+\.(png|jpg|jpeg|gif|svg|pdf|webp))\)/gi;
+                const basenameMatches = [...basenameFixedContent.matchAll(basenameOnlyRegex)];
+
+                console.log(`🔍 Found ${basenameMatches.length} basename-only link(s) in markdown`);
+
+                for (const match of basenameMatches) {
+                    const fullMatch = match[0];
+                    const altText = match[1];
+                    const basenameLink = match[2];
+
+                    // Decode %20 to spaces for comparison
+                    const decodedBasename = basenameLink.replace(/%20/g, ' ');
+
+                    // Check if this basename exists in the note-named subfolder
+                    if (basenameMap[decodedBasename]) {
+                        // The file exists in vault's note-named subfolder but link is basename-only
+                        // We need to: 1) Move file in filesystem, 2) Update vault symlink, 3) Fix markdown link
+
+                        const vaultFilePath = basenameMap[decodedBasename];
+
+                        // Determine where the file should be in filesystem
+                        const filesystemSubfolder = path.join(realDir, 'assets', noteBaseName);
+                        const newFilesystemPath = path.join(filesystemSubfolder, decodedBasename);
+
+                        // Check if vault file is a symlink to filesystem
+                        const vaultFileStats = fs.lstatSync(vaultFilePath);
+                        if (vaultFileStats.isSymbolicLink()) {
+                            // Read where the symlink currently points
+                            const currentFilesystemPath = fs.readlinkSync(vaultFilePath);
+
+                            // Only update if symlink is not already pointing to correct location
+                            if (currentFilesystemPath !== newFilesystemPath) {
+                                // Create subfolder in filesystem if it doesn't exist
+                                if (!fs.existsSync(filesystemSubfolder)) {
+                                    fs.mkdirSync(filesystemSubfolder, { recursive: true });
+                                    console.log(`📁 Created filesystem subfolder: ${filesystemSubfolder}`);
+                                }
+
+                                // Move file in filesystem if source exists and target doesn't
+                                if (fs.existsSync(currentFilesystemPath) && !fs.existsSync(newFilesystemPath)) {
+                                    fs.renameSync(currentFilesystemPath, newFilesystemPath);
+                                    console.log(`📦 Moved file: ${path.basename(currentFilesystemPath)} -> ${filesystemSubfolder}/`);
+                                } else if (fs.existsSync(newFilesystemPath)) {
+                                    console.log(`⏭️ File already exists at target location: ${newFilesystemPath}`);
+                                } else {
+                                    console.log(`⚠️ Source file not found at: ${currentFilesystemPath}`);
+                                }
+
+                                // Update the symlink to point to new location (only if target exists)
+                                if (fs.existsSync(newFilesystemPath)) {
+                                    fs.unlinkSync(vaultFilePath);
+                                    fs.symlinkSync(newFilesystemPath, vaultFilePath);
+                                    console.log(`🔗 Updated symlink to new location`);
+                                }
+                            }
+                        }
+
+                        // Update the markdown link to include the path prefix
+                        const encodedNoteName = noteBaseName.replace(/ /g, '%20');
+                        const correctPath = `assets/${encodedNoteName}/${basenameLink}`;
+                        const newLink = `![${altText}](${correctPath})`;
+
+                        basenameFixedContent = basenameFixedContent.replace(fullMatch, newLink);
+                        basenamesFixed++;
+                        console.log(`🔧 Fixed basename link: ${basenameLink} -> ${correctPath}`);
+                    }
+                }
+            }
+        } catch (error) {
+            console.log(`⚠️ Error scanning note-named subfolder: ${error.message}`);
+        }
+    }
+
+    if (basenamesFixed > 0) {
+        console.log(`🔧 Fixed ${basenamesFixed} basename-only link(s)`);
+        await app.vault.modify(currentFile, basenameFixedContent);
+        content = basenameFixedContent;  // Update content for further processing
+    }
+
+    // STEP 2: Find all attachment links (images and PDFs)
     // Handles both:
     // 1. Standard markdown: ![alt](path) or <img src="path">
     // 2. Obsidian wiki-links: ![[filename]]
@@ -109,7 +251,35 @@ async function syncAttachments() {
                 return;
             }
         } else {
-            // Standard markdown - path is relative or absolute
+            // Standard markdown - check filesystem first (Typora), then vault (Obsidian)
+            const filesystemCheckPath = path.join(realDir, decodedPath);
+
+            if (fs.existsSync(filesystemCheckPath)) {
+                // File exists in filesystem (added by Typora)
+                // Create symlink in vault if it doesn't exist
+                const vaultTargetPath = path.join(vaultPath, realDir.substring(1), decodedPath);
+                const vaultTargetDir = path.dirname(vaultTargetPath);
+
+                if (!fs.existsSync(vaultTargetDir)) {
+                    fs.mkdirSync(vaultTargetDir, { recursive: true });
+                    console.log(`✅ Created vault directory: ${vaultTargetDir}`);
+                }
+
+                if (!fs.existsSync(vaultTargetPath)) {
+                    fs.symlinkSync(filesystemCheckPath, vaultTargetPath);
+                    console.log(`🔗 Created symlink in vault: ${vaultTargetPath} -> ${filesystemCheckPath}`);
+                    movedCount++;
+                } else {
+                    const stats = fs.lstatSync(vaultTargetPath);
+                    if (stats.isSymbolicLink()) {
+                        console.log(`⏭️ Skipping ${decodedPath} - symlink already exists`);
+                        skippedCount++;
+                    }
+                }
+                return;  // Done with this file
+            }
+
+            // File not in filesystem, check vault (Obsidian case)
             vaultAttachmentPath = path.join(vaultPath, decodedPath);
 
             if (!fs.existsSync(vaultAttachmentPath)) {
@@ -119,7 +289,7 @@ async function syncAttachments() {
             }
 
             if (!fs.existsSync(vaultAttachmentPath)) {
-                console.log(`⚠️ Skipping ${decodedPath} - not found in vault`);
+                console.log(`⚠️ Skipping ${decodedPath} - not found in vault or filesystem`);
                 skippedCount++;
                 return;
             }
@@ -223,10 +393,21 @@ async function syncAttachments() {
     // Update the file content if changes were made
     if (movedCount > 0) {
         await app.vault.modify(currentFile, updatedContent);
-        new Notice(`✅ Synced ${movedCount} attachment(s) to filesystem` +
-                   (skippedCount > 0 ? ` (${skippedCount} already synced)` : ''));
+        let message = `✅ Synced ${movedCount} attachment(s) to filesystem`;
+        if (skippedCount > 0) message += ` (${skippedCount} already synced)`;
+        if (spacesFixed > 0) message += ` • Fixed ${spacesFixed} space(s)`;
+        if (basenamesFixed > 0) message += ` • Fixed ${basenamesFixed} path(s)`;
+        new Notice(message);
+    } else if (spacesFixed > 0 || basenamesFixed > 0) {
+        let message = '✅ ';
+        const fixes = [];
+        if (spacesFixed > 0) fixes.push(`Fixed ${spacesFixed} space(s)`);
+        if (basenamesFixed > 0) fixes.push(`Fixed ${basenamesFixed} path(s)`);
+        message += fixes.join(' • ');
+        if (skippedCount > 0) message += ` • ${skippedCount} already synced`;
+        new Notice(message);
     } else {
-        new Notice(`ℹ️ No attachments needed syncing` +
+        new Notice(`ℹ️ No changes needed` +
                    (skippedCount > 0 ? ` (${skippedCount} already synced)` : ''));
     }
 
