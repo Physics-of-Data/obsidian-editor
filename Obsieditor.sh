@@ -245,9 +245,6 @@ EOF
 
 		# URL-encode any paths with spaces in the markdown file
 		fix_markdown_links "$abspath"
-
-		# Small delay to ensure file write completes before editors notice
-		sleep 0.2
 	fi
 
 	# 1. If the file is inside any vault (in place or linked), just open it
@@ -256,12 +253,6 @@ EOF
 		foundpath="$(find -L "$v" -samefile "$abspath" -and ! -path "*/.trash/*")"
 		if [[ $foundpath ]]
 		then
-			# Even if file exists in vault, check for new linked files (images/PDFs)
-			# This handles the case where user added images in external editor (Typora)
-			get_linked_files "$abspath" "$(dirname "$foundpath")"
-			sleep 1
-			reload_obsidian "$v"
-			sleep 1
 			open_file "$foundpath"
 			continue 2  # next input file
 		fi
