@@ -1,15 +1,15 @@
-# Obsieditor.sh Quick Start Guide
+# obseditor Quick Start Guide
 
 ## Overview
 
-This toolset allows you to edit markdown files from anywhere on your filesystem using Obsidian, while keeping the files and their attachments in their original locations.
+This toolset allows you to edit markdown files from anywhere on your filesystem using *Obsidian*, while keeping the files and their attachments in their original locations.
 
 ## Installation
 
-1. Place `Obsieditor.sh` in `/storage/develop/utils/obsidian-editor/`
-2. Make it executable: `chmod +x Obsieditor.sh`
+1. Place `obseditor` in `/storage/develop/utils/obsidian-editor/`
+2. Make it executable: `chmod +x obseditor`
 3. Copy `Sync Attachments.md` to `~/obsidian/default/Templates/`
-4. Configure Templater hotkey (see below)
+4. Configure *Templater* hotkey (see below)
 
 ## Basic Workflow
 
@@ -17,11 +17,11 @@ This toolset allows you to edit markdown files from anywhere on your filesystem 
 
 ```bash
 # Open existing markdown file
-./Obsieditor.sh ~/Documents/MyNote.md
+./obseditor ~/Documents/MyNote.md
 
 # Create and open new file
-./Obsieditor.sh -n ~/Documents/NewNote.md
-./Obsieditor.sh --new "~/Documents/My New Note.md"
+./obseditor -n ~/Documents/NewNote.md
+./obseditor --new "~/Documents/My New Note.md"
 ```
 
 ### What Happens:
@@ -34,12 +34,12 @@ This toolset allows you to edit markdown files from anywhere on your filesystem 
 
 ## Syncing Attachments Back to Filesystem
 
-When you paste images or PDFs in Obsidian, they're saved to `~/obsidian/default/assets/`. To move them back to the filesystem:
+When you paste images or PDFs in Obsidian, they're saved to `~/obsidian/default/assets/`, or `~/obsidian/default/attachments/`, depending how the folder for new attachments was set up in **Settings**. To move them back to the filesystem:
 
 ### Setup (One-time)
 
 1. Open Obsidian → **Settings** → **Hotkeys**
-2. Search for: "Templater: Replace templates in the active file"
+2. Search for: "Templater: Sync Attachments"
 3. Set hotkey to: **Alt+U**
 4. Save
 
@@ -57,16 +57,19 @@ When you paste images or PDFs in Obsidian, they're saved to `~/obsidian/default/
 
 **Before opening in Obsidian:**
 ```
+  Filesystem
 ~/Documents/
   └── Project Ideas.md
 ```
 
-**After opening with Obsieditor.sh:**
+**After opening with obseditor:**
 ```
+  Filesystem
 ~/Documents/
   ├── Project Ideas.md              (original file)
   └── Project Ideas.bkup.md         (backup)
 
+  Vault
 ~/obsidian/default/
   └── home/msfz751/Documents/
       └── Project Ideas.md          (symlink → original)
@@ -74,6 +77,7 @@ When you paste images or PDFs in Obsidian, they're saved to `~/obsidian/default/
 
 **After pasting images in Obsidian:**
 ```
+  Vault
 ~/obsidian/default/
   └── assets/
       ├── image-20251104172437165.png
@@ -82,6 +86,7 @@ When you paste images or PDFs in Obsidian, they're saved to `~/obsidian/default/
 
 **After pressing Alt+U:**
 ```
+  Filesystem
 ~/Documents/
   ├── Project Ideas.md
   ├── Project Ideas.bkup.md
@@ -89,6 +94,7 @@ When you paste images or PDFs in Obsidian, they're saved to `~/obsidian/default/
       ├── image-20251104172437165.png    (real file)
       └── report.pdf                     (real file)
 
+  Vault
 ~/obsidian/default/
   ├── home/msfz751/Documents/
   │   └── Project Ideas.md               (symlink → original)
@@ -122,7 +128,7 @@ assets/Project Ideas/report.pdf
 - If still not visible, manually press `Ctrl+P` → "Reload app without saving"
 
 ### Alt+U says "not a symlink"
-- Only works with files opened via `Obsieditor.sh`
+- Only works with files opened via `obseditor`
 - Regular files in the vault won't work
 
 ### Attachments not moving
@@ -158,21 +164,21 @@ assets/Project Ideas/report.pdf
 
 ```bash
 # Creates parent directories automatically
-./Obsieditor.sh -n ~/Documents/Projects/2025/Q1/Planning.md
+./obseditor -n ~/Documents/Projects/2025/Q1/Planning.md
 ```
 
 ### Batch Opening
 
 ```bash
 # Open multiple files (not all at once)
-./Obsieditor.sh ~/Documents/Note1.md
-./Obsieditor.sh ~/Documents/Note2.md
-./Obsieditor.sh ~/Documents/Note3.md
+./obseditor ~/Documents/Note1.md
+./obseditor ~/Documents/Note2.md
+./obseditor ~/Documents/Note3.md
 ```
 
 ### Integration with File Manager
 
-You can set `Obsieditor.sh` as the default handler for `.md` files in your file manager.
+You can set `obseditor` as the default handler for `.md` files in your file manager.
 
 **Example for Linux (using xdg):**
 1. Create desktop entry: `~/.local/share/applications/obsieditor.desktop`
@@ -182,5 +188,5 @@ You can set `Obsieditor.sh` as the default handler for `.md` files in your file 
 
 - [TEMPLATER-SETUP.md](TEMPLATER-SETUP.md) - Detailed Templater configuration
 - [BUGS.md](BUGS.md) - Complete list of bugs fixed and technical details
-- [Obsieditor.sh](Obsieditor.sh) - Main script with inline comments
-- [Sync Attachments.md](Sync Attachments.md) - Templater template source code
+- [obseditor](obseditor) - Main script with inline comments
+- [Sync Attachments.md](Sync%20Attachments.md) - Templater template source code

@@ -8,13 +8,13 @@ This Templater script syncs attachments (images, PDFs) from the Obsidian vault b
 
 ### The Problem
 1. You create a markdown file: `~/Documents/Project Ideas.md`
-2. Obsieditor creates a symlink: `~/obsidian/default/home/msfz751/Documents/Project Ideas.md`
+2. `obsieditor` creates a symlink: `~/obsidian/default/$HOME/Documents/Project Ideas.md`
 3. You paste images/PDFs in Obsidian
 4. Attachments are saved to: `~/obsidian/default/assets/`
 5. **Problem**: Typora can't access them because they only exist in the vault
 
 ### The Solution
-When you press **Alt+U**, the script:
+When you press **Alt+U**, invoking the template, the script:
 1. Finds all attachments referenced in the current note
 2. Moves them from `~/obsidian/default/assets/` to `~/Documents/assets/Project Ideas/`
 3. Creates symlinks in the vault pointing to the real files
@@ -38,18 +38,18 @@ When you press **Alt+U**, the script:
 
 ### Step 2: Create Templates Folder
 
-1. In your vault (`~/obsidian/default/`), create a folder called `Templates`
+1. In your vault (`~/obsidian/default/`), create a folder called `Templates`. I chose `Extras/Templates`, for instance
 2. Or use an existing templates folder
 
 ### Step 3: Add the Template File
 
 1. Copy `Sync Attachments.md` to your templates folder
-2. Full path: `~/obsidian/default/Templates/Sync Attachments.md`
+2. Full path: `~/obsidian/default/Extras/Templates/Sync Attachments.md`
 
 ### Step 4: Configure Templater
 
 1. Go to **Settings** → **Templater**
-2. Under **Template folder location**, set it to `Templates`
+2. Under **Template folder location**, set it to `Extras/Templates`
 3. Enable **Trigger Templater on new file creation** (optional)
 
 ### Step 5: Set Up Hotkey
@@ -76,7 +76,7 @@ When you press **Alt+U**, the script:
 **Before**:
 ```
 ~/Documents/Project Ideas.md  (original file)
-~/obsidian/default/home/msfz751/Documents/Project Ideas.md  (symlink)
+~/obsidian/default/$HOME/Documents/Project Ideas.md  (symlink)
 ~/obsidian/default/assets/image-20251104172437165.png  (real file)
 ~/obsidian/default/assets/asy_latex-1_0.pdf  (real file)
 ```
@@ -86,7 +86,7 @@ When you press **Alt+U**, the script:
 ~/Documents/Project Ideas.md  (original file)
 ~/Documents/assets/Project Ideas/image-20251104172437165.png  (real file)
 ~/Documents/assets/Project Ideas/asy_latex-1_0.pdf  (real file)
-~/obsidian/default/home/msfz751/Documents/Project Ideas.md  (symlink)
+~/obsidian/default/$HOME/Documents/Project Ideas.md  (symlink)
 ~/obsidian/default/assets/image-20251104172437165.png  (symlink → filesystem)
 ~/obsidian/default/assets/asy_latex-1_0.pdf  (symlink → filesystem)
 ```
@@ -109,7 +109,7 @@ When you press **Alt+U**, the script:
 
 ### Script doesn't run
 - Check that Templater is enabled
-- Check that User Scripts are enabled in Templater settings
+- Check that the hotkey is set
 - Verify the script path in Templater settings
 
 ### Hotkey doesn't work
@@ -126,15 +126,10 @@ When you press **Alt+U**, the script:
 - The script only moves files that aren't already symlinks
 - If a file is already a symlink, it's been processed before
 
-## Script Location
-
-The script file: `sync-attachments-to-filesystem.js`
-
-Should be placed in: `~/obsidian/default/Templates/`
-
 ## Notes
 
 - The script only processes attachments that aren't already symlinks
 - It automatically creates the `assets/[Note Name]/` directory structure
 - Spaces in filenames are URL-encoded in markdown links (`%20`)
 - The script works with both markdown image syntax and HTML img tags
+- We use `assets` to get closer to the denomination that Typora uses

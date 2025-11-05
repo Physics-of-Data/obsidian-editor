@@ -9,17 +9,20 @@ Added ability to create new markdown files directly from the command line using 
 
 ```bash
 # Create a new file
-Obsieditor.sh -n "My New Note.md"
-Obsieditor.sh --new "Project Ideas.md"
+obseditor -n "My New Note.md"
+obseditor --new "Project Ideas.md"
 
 # Create file with spaces in name
-Obsieditor.sh -n "Meeting Notes 2024.md"
+obseditor -n "Meeting Notes 2024.md"
 
 # Automatically adds .md extension if missing
-Obsieditor.sh -n "TODO"  # Creates TODO.md
+obseditor -n "TODO"  # Creates TODO.md
 
 # Open existing file (no flag needed)
-Obsieditor.sh "existing.md"
+obseditor "existing.md"
+
+# Create multiple markdown files
+obseditor --new "BUGS.md" "FEATURES.md" "QUICK-START.md"
 ```
 
 ### Implementation
@@ -69,4 +72,4 @@ fi
 - ✅ Adds basic header with filename as title
 - ✅ Immediately opens in Obsidian after creation
 - ✅ Works with filenames containing spaces
-- ✅ Supports multiple files at once
+- ✅ Supports creation and opening of multiple files at once

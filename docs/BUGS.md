@@ -1,4 +1,4 @@
-# Bug Fixes for Obsieditor.sh
+# Bug Fixes for obseditor
 
 ## Summary of Changes
 
@@ -9,7 +9,7 @@ This document describes the bugs fixed in the Obsidian editor script and the sol
 ## Bug #1: Missing Backup Functionality
 
 ### Problem
-The script did not create backups of markdown files before modifying them, risking data loss if something went wrong during processing.
+The script did not create backups of markdown files before modifying them, risking data loss if something went wrong during processing. `obseditor` will change spaces in the filename by "%20", to make it compatible between markdown editors like Typora and Obsidian.
 
 ### Solution
 Added automatic backup creation before any modifications:
@@ -34,7 +34,7 @@ fi
 ## Bug #2: Obsidian Not Refreshing After Adding Symlinks
 
 ### Problem
-After creating symlinks for markdown files and their resources (images, PDFs), Obsidian would not display them until manually reloading with `Ctrl+P` → "Reload app without saving".
+After creating symlinks for markdown files and their resources (images, PDFs), Obsidian would not display them until manually reloading with `Ctrl+P` → "Reload app without saving". We want this to happen automatically in the background.
 
 ### Solution
 Implemented automatic Obsidian reload functionality using `xdotool`:
@@ -83,16 +83,13 @@ reload_obsidian() {
 ### Problem
 Markdown files with spaces in filenames or resource paths would not display correctly in Obsidian. Links like:
 ```markdown
-![image](assets/Where to invest 10000 USD/image.png)
-![](Where to invest 10000 USD.pdf)
+![image](assets/Where%20to%20invest%2010000%20USD/image.png)
+![](Where%20to%20invest%2010000%20USD.pdf)
 ```
 
-Would show as broken because Obsidian requires spaces to be encoded as `%20` in markdown links.
+would show as broken because Obsidian requires spaces to be encoded as `%20` in markdown links.
 
-### Initial Misunderstanding
-Initially attempted to URL-encode all special characters (spaces, commas, periods, etc.), which broke Obsidian's rendering even further.
-
-### Correct Solution
+### Solution
 Obsidian only requires **spaces** to be encoded as `%20`. All other characters (commas, periods, hyphens, etc.) should remain as-is.
 
 #### Part 1: Fix Markdown Links (Only Encode Spaces)
@@ -105,16 +102,16 @@ fix_markdown_links() {
     # Use perl to find and encode ONLY spaces in markdown links
     # Obsidian only requires spaces to be encoded as %20, other chars remain as-is
     perl -i.bak -pe '
-        # Fix markdown-style links: ![...](path with spaces)
+        # Fix markdown-style links: ![...](path%20with%20spaces)
         s{\]\(([^)]+)\)}{
             my $path = $1;
             if ($path =~ / / && $path !~ /%20/) {
                 $path =~ s/ /%20/g;
             }
-            "](" . $path . ")";
+            "]("%20.%20$path%20.%20")";
         }ge;
 
-        # Fix HTML img src: src="path with spaces"
+        # Fix HTML img src: src="path%20with%20spaces"
         s{src="([^"]+)"}{
             my $path = $1;
             if ($path =~ / / && $path !~ /%20/) {
@@ -197,7 +194,7 @@ done
 Given a file: `Tian2019. Applying Machine-Learning, Pressure, and Temperature.md`
 
 **Before Fix** (broken):
-- Markdown: `![](Tian2019. Applying Machine-Learning, Pressure, and Temperature.pdf)`
+- Markdown: `![](Tian2019.%20Applying%20Machine-Learning,%20Pressure,%20and%20Temperature.pdf)`
 - Symlink: `Tian2019. Applying Machine-Learning, Pressure, and Temperature.pdf`
 - Result: ❌ Obsidian cannot find the file
 
