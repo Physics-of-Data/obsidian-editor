@@ -263,10 +263,16 @@ EOF
 	#    and put a link to the file in it; then open that
 	for asset_folder in "${subtrees_that_must_be_mirrored_in_vault[@]}"
 	do
-        linkpath="$default_vault/$(basename "$asset_folder")${abspath#$asset_folder}"
 		if [[ "$abspath" == "$asset_folder"* ]]
 		then
-			linkpath="$default_vault/$(basename "$asset_folder")${abspath#$asset_folder}"
+			# Get the relative path within the asset folder
+			rel_path="${abspath#$asset_folder}"
+			# Strip dots from hidden directories in the path
+			vault_rel_path=$(echo "$rel_path" | sed 's|/\.|/|g')
+			# Also strip dot from basename if it's hidden
+			folder_basename=$(basename "$asset_folder" | sed 's/^\.//')
+
+			linkpath="$default_vault/$folder_basename$vault_rel_path"
 			mkdir -p "$(dirname "$linkpath")"
 			ln -s "$abspath" "$linkpath"			
 			get_linked_files "$abspath" "$(dirname "$linkpath")"
