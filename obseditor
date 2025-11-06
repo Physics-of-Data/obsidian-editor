@@ -274,7 +274,7 @@ EOF
 
 			linkpath="$default_vault/$folder_basename$vault_rel_path"
 			mkdir -p "$(dirname "$linkpath")"
-			ln -s "$abspath" "$linkpath"			
+			ln -s "$abspath" "$linkpath"
 			get_linked_files "$abspath" "$(dirname "$linkpath")"
 			sleep 1  # delay for Obsidian to notice the new file(s)
 			reload_obsidian "$default_vault"
@@ -288,7 +288,12 @@ EOF
 	# Remove leading / from absolute path
 	relative_path="${abspath#/}"
 
-	linkpath="$default_vault/$relative_path"
+	# Strip leading dots from hidden directories to make them visible in Obsidian
+	# This transforms paths like "home/user/.local/share" to "home/user/local/share"
+	# while keeping the symlink pointing to the correct location
+	vault_path=$(echo "$relative_path" | sed 's|/\.|/|g')
+
+	linkpath="$default_vault/$vault_path"
 	mkdir -p "$(dirname "$linkpath")"
 
 	# If the exact symlink already exists, just open it
