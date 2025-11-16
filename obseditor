@@ -14,6 +14,11 @@ vault_where_files_must_be_opened="$HOME/obsidian/default/"
 subtrees_that_must_be_mirrored_in_vault=(
 )
 
+# Backup configuration
+# Set to true to create a backup (.bkup.md) file before converting to Obsidian note
+# Set to false to skip backup creation
+CREATE_BACKUP=false
+
 
 # Get vault names from obsidian.json as an array
 mapfile -t all_vaults < <(awk -F':|,|{|}|"' '{for(i=1;i<=NF;i++)if($i=="path")print$(i+3)}'\
@@ -239,9 +244,12 @@ EOF
 	# Create a backup of the markdown file and fix links with spaces
 	if [[ "$abspath" == *.md ]]
 	then
-		backup_path="${abspath%.md}.bkup.md"
-		cp "$abspath" "$backup_path"
-		logger "OPEN-IN-OBSIDIAN: Created backup at $backup_path"
+		# Create backup if enabled
+		if [[ "$CREATE_BACKUP" == true ]]; then
+			backup_path="${abspath%.md}.bkup.md"
+			cp "$abspath" "$backup_path"
+			logger "OPEN-IN-OBSIDIAN: Created backup at $backup_path"
+		fi
 
 		# URL-encode any paths with spaces in the markdown file
 		fix_markdown_links "$abspath"
